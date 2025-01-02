@@ -1,17 +1,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "server.h"
+#include "master.h"
 
 int main(int argc, char* argv[]) {
-    TCPServer* server = tcp_server_init();
+    MasterProcess* master = master_process_init();
 
-    tcp_server_start(server);
+    run_master_process(master);
 
-    sleep(2);
-
-    tcp_server_stop(server);
-
-    free(server);
+    free_master_process(master);
     exit(EXIT_SUCCESS);
 }
