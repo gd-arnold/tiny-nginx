@@ -7,7 +7,6 @@
 
 typedef struct MasterProcess {
     pid_t pid;
-    pid_t workers[MAX_WORKERS_COUNT];
     uint8_t workers_count;
 } MasterProcess;
 
