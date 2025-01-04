@@ -2,9 +2,12 @@
 
 #include <sys/types.h>
 
-typedef struct WorkerProcess {
-    pid_t pid;
-    // todo: cpuid (for cpu affinity)
-} WorkerProcess;
+#include "server.h"
 
-WorkerProcess* worker_process_init();
+//typedef struct WorkerProcess {
+//    pid_t pid;
+    // todo: cpuid (for cpu affinity)
+//} WorkerProcess;
+
+//WorkerProcess* worker_process_init();
+void run_worker_process(pid_t w_pid, TCPServer* server);

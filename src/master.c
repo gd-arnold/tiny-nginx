@@ -7,6 +7,7 @@
 #include "dbg.h"
 #include "server.h"
 #include "master.h"
+#include "worker.h"
 
 static void spawn_worker_processes(MasterProcess* master);
 
@@ -53,10 +54,12 @@ static void spawn_worker_processes(MasterProcess* master) {
         if (pid == 0) {
             pid_t w_pid = getpid();
 
+            // todo: bind w_pid to a cpu
+
             log_info("Worker #%ld (PID: %d) started working\n\n", i + 1, w_pid);
 
             // todo: run ev loop
-            sleep(2);
+            run_worker_process(w_pid, g_server);
 
             log_info("Worker #%ld (PID: %d) finished working\n\n", i + 1, w_pid);
 
