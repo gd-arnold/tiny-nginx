@@ -4,8 +4,10 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "dbg.h"
+#include "event.h"
 #include "server.h"
 
 TCPServer* tcp_server_init() {
@@ -24,7 +26,8 @@ void tcp_server_start(TCPServer* server) {
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
     check(server_fd != -1, "Server socket creation failed");
 
-    // todo: make non-blocking
+    // make non-blocking
+    make_non_blocking(server_fd);
 
     // todo: read port from config file
     uint16_t port = 3636;
