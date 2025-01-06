@@ -57,7 +57,7 @@ error:
 }
 
 size_t es_wait(EventSystem* es) {
-    size_t nready = epoll_wait(es->epoll_fd, es->events, sizeof(es->events), -1);
+    size_t nready = epoll_wait(es->epoll_fd, es->events, MAX_EVENTS, -1);
     return nready;
 }
 
