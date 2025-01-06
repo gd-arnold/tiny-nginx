@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/epoll.h>
+#include <fcntl.h>
 
 #include "event.h"
 #include "dbg.h"
@@ -19,7 +20,7 @@ error:
     exit(EXIT_FAILURE);
 }
 
-void add(EventSystem* es, int fd, uint32_t events) {
+void es_add(EventSystem* es, int fd, uint32_t events) {
     struct epoll_event event;
     event.data.fd = fd;
     event.events = events;
@@ -32,7 +33,7 @@ error:
     exit(EXIT_FAILURE);
 }
 
-void mod(EventSystem* es, int fd, uint32_t events) {
+void es_mod(EventSystem* es, int fd, uint32_t events) {
     struct epoll_event event;
     event.data.fd = fd;
     event.events = events;
@@ -46,7 +47,7 @@ error:
 
 }
 
-void del(EventSystem* es, int fd, uint32_t events) {
+void es_del(EventSystem* es, int fd, uint32_t events) {
     int res = epoll_ctl(es->epoll_fd, EPOLL_CTL_DEL, fd, NULL);
     check(res != -1, "Failed to delete epoll event");
 
@@ -55,7 +56,17 @@ error:
     exit(EXIT_FAILURE);
 }
 
-size_t wait(EventSystem* es) {
+size_t es_wait(EventSystem* es) {
     size_t nready = epoll_wait(es->epoll_fd, es->events, sizeof(es->events), -1);
     return nready;
+}
+
+void make_non_blocking(int fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    int res = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+    check(res != -1, "Failed making fd non-blocking");
+
+    return;
+error:
+    exit(EXIT_FAILURE);
 }

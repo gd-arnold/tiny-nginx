@@ -11,8 +11,10 @@ typedef struct EventSystem {
 
 EventSystem* event_system_init();
 
-void add(EventSystem* es, int fd, uint32_t events);
-void mod(EventSystem* es, int fd, uint32_t events);
-void del(EventSystem* es, int fd, uint32_t events);
+void es_add(EventSystem* es, int fd, uint32_t events);
+void es_mod(EventSystem* es, int fd, uint32_t events);
+void es_del(EventSystem* es, int fd, uint32_t events);
 
-size_t wait(EventSystem* es);
+size_t es_wait(EventSystem* es);
+
+void make_non_blocking(int fd);
