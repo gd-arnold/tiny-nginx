@@ -63,8 +63,10 @@ size_t es_wait(EventSystem* es) {
 
 void make_non_blocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
+    check(flags != -1, "Failed getting flags of fd #%d", fd);
+
     int res = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-    check(res != -1, "Failed making fd non-blocking");
+    check(res != -1, "Failed making fd #%d non-blocking", fd);
 
     return;
 error:
