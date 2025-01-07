@@ -47,7 +47,7 @@ error:
 
 }
 
-void es_del(EventSystem* es, int fd, uint32_t events) {
+void es_del(EventSystem* es, int fd) {
     int res = epoll_ctl(es->epoll_fd, EPOLL_CTL_DEL, fd, NULL);
     check(res != -1, "Failed to delete epoll event");
 
