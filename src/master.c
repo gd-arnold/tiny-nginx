@@ -10,6 +10,8 @@
 #include "worker.h"
 
 static void spawn_worker_processes(MasterProcess* master);
+//static void handle_worker_exit(MasterProcess* master);
+//static void handle_shutdown(MasterProcess* master);
 
 static TCPServer* g_server = NULL;
 
@@ -18,8 +20,9 @@ MasterProcess* master_process_init() {
     check_mem(master);
 
     master->pid = getpid();
+    memset(master->w_pids, 0, sizeof(master->w_pids));
     // todo: read workers count from config file
-    master->workers_count = 16;
+    master->workers_count = 1;
 
     g_server = tcp_server_init();
     tcp_server_start(g_server);
@@ -33,9 +36,9 @@ void run_master_process(MasterProcess* master) {
     spawn_worker_processes(master);
 
     // todo: run ev loop; handle signals from child processes
-    
-    // temporary test
-    sleep(10);
+    //while (true) {
+        sleep(10);
+    //}
     return;
 }
 
@@ -48,9 +51,9 @@ void free_master_process(MasterProcess* master) {
 static void spawn_worker_processes(MasterProcess* master) {
     for (size_t i = 0; i < master->workers_count; i++) {
         pid_t pid = fork();
-
         check(pid != -1, "Failed forking worker process");
 
+        master->w_pids[i] = pid;
         if (pid == 0) {
             pid_t w_pid = getpid();
 
