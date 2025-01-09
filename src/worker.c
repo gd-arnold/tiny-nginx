@@ -61,7 +61,7 @@ static void accept_client(EventSystem* es, TCPServer* server) {
             log_err("Worker (PID: #%d) failed accepting connection", getpid());
     }
 
-    log_info("Worker (PID: #%d) has accepted request from client #%d", getpid(), client_fd);
+    log_info("Worker (PID: #%d) accepted request from client #%d", getpid(), client_fd);
 
     // todo: log client data
 
@@ -69,12 +69,12 @@ static void accept_client(EventSystem* es, TCPServer* server) {
 
     HTTPClient* client = http_client_init(client_fd);
     es_add(es, client_fd, client, EPOLLIN);
-    log_info("Worker (PID: #%d) has added client #%d to epoll", getpid(), client_fd);
+    log_info("Worker (PID: #%d) added client #%d to epoll", getpid(), client_fd);
 
     es_del(es, client_fd);
-    log_info("Worker (PID: #%d) has removed client #%d from epoll", getpid(), client_fd);
+    log_info("Worker (PID: #%d) removed client #%d from epoll", getpid(), client_fd);
 
     close(client_fd);
     free(client);
-    log_info("Worker (PID: #%d) has closed connection with client #%d", getpid(), client_fd);
+    log_info("Worker (PID: #%d) closed connection with client #%d", getpid(), client_fd);
 }
