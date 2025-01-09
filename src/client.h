@@ -2,11 +2,13 @@
 
 #include <stdlib.h>
 
+#include "event.h"
+
 #define MAX_CLIENT_READ_BUF 4096
 #define MAX_CLIENT_WRITE_BUF 4096
 
 typedef struct HTTPClient {
-    int fd;
+    EventBase event;
 
     // read state
     char read[MAX_CLIENT_READ_BUF];

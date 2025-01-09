@@ -15,7 +15,8 @@ TCPServer* tcp_server_init() {
     check_mem(server);
 
     server->port = 0;
-    server->socket_fd = 0;
+    server->event.fd = 0;
+    server->event.type = SERVER_EVENT;
 
     return server;
 error:
@@ -23,11 +24,11 @@ error:
 }
 
 void tcp_server_start(TCPServer* server) {
-    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    check(server_fd != -1, "Server socket creation failed");
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    check(fd != -1, "Server socket creation failed");
 
     // make non-blocking
-    make_non_blocking(server_fd);
+    make_non_blocking(fd);
 
     // todo: read port from config file
     uint16_t port = 3636;
@@ -39,14 +40,14 @@ void tcp_server_start(TCPServer* server) {
     address.sin_addr.s_addr = INADDR_ANY;
 
     // bind address to socket
-    int br = bind(server_fd, (struct sockaddr*) &address, sizeof(address));
+    int br = bind(fd, (struct sockaddr*) &address, sizeof(address));
     check(br != -1, "Failed binding server address to socket");
 
     // open socket
-    int lr = listen(server_fd, SOMAXCONN);
+    int lr = listen(fd, SOMAXCONN);
     check(lr != -1, "Failed to open server socket");
 
-    server->socket_fd = server_fd;
+    server->event.fd = fd;
     server->port = port;
 
     return;
@@ -55,10 +56,6 @@ error:
 }
 
 void tcp_server_stop(TCPServer* server) {
-    check(server->socket_fd != 0, "Invalid server socket fd. Failed closing connection");
-
-    close(server->socket_fd);
+    close(server->event.fd);
     return;
-error:
-    exit(EXIT_FAILURE);
 }

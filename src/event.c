@@ -20,9 +20,9 @@ error:
     exit(EXIT_FAILURE);
 }
 
-void es_add(EventSystem* es, int fd, uint32_t events) {
+void es_add(EventSystem* es, int fd, void* data, uint32_t events) {
     struct epoll_event event;
-    event.data.fd = fd;
+    event.data.ptr = data;
     event.events = events;
 
     int res = epoll_ctl(es->epoll_fd, EPOLL_CTL_ADD, fd, &event);

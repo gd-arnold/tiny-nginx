@@ -2,8 +2,10 @@
 
 #include <stdint.h>
 
+#include "event.h"
+
 typedef struct TCPServer {
-    int socket_fd;
+    EventBase event;
     uint16_t port;
 } TCPServer;
 
