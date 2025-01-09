@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
@@ -8,68 +9,72 @@
 #include <sys/epoll.h>
 
 #include "worker.h"
+#include "client.h"
 #include "dbg.h"
 #include "event.h"
-#include "master.h"
+#include "server.h"
 
-void run_worker_process(pid_t w_pid, TCPServer* server) {
+static void accept_client(EventSystem* es, TCPServer* server);
+
+void run_worker_process(TCPServer* server) {
     EventSystem* es = event_system_init();
-    es_add(es, server->socket_fd, EPOLLIN);
+    es_add(es, server->event.fd, server, EPOLLIN);
 
     // main event loop
-//    while (true) {
+    //while (true) {
         size_t nready = es_wait(es);
 
         for (size_t i = 0; i < nready; i++) {
-            int fd = es->events[i].data.fd;
+            EventBase* event = (EventBase*) es->events[i].data.ptr;
             uint32_t events = es->events[i].events;
             
-            if (fd == server->socket_fd) {
-                // accept client
-                struct sockaddr_in client_address;
-                socklen_t client_address_size = sizeof(client_address);
-
-                int client_fd = accept(server->socket_fd, (struct sockaddr*) &client_address, &client_address_size);
-                check(client_fd != -1, "Worker (PID: #%d) failed accepting connection", w_pid);
-
-                log_info("Worker (PID: #%d) has accepted request from client.", w_pid);
-
-                char r_buffer[1024];
-                memset(r_buffer, 0, sizeof(r_buffer));
-                check(read(client_fd, r_buffer, sizeof(r_buffer) - 1) != -1, " ");
-                log_info("REQUEST: %s", r_buffer);
-
-                char buffer[1024] = "HTTP/1.1 200OK\r\n\r\ntest";
-                send(client_fd, buffer, sizeof(buffer), 0);
-
-                close(client_fd);
-
-                log_info("Worker (PID: #%d) has served request to client. Closing connection.", w_pid);
-                //
-            } else if (events & EPOLLIN) {
-                // receive from client
-            } else if (events & EPOLLOUT) {
-                // send to client
+            switch (event->type) {
+                case SERVER_EVENT:
+                    accept_client(es, server);
+                    break;
+                case CLIENT_EVENT:
+                    if (events & EPOLLIN) {
+                        // receive from client
+                    } else if (events & EPOLLOUT) {
+                        // send to client
+                    }
+                    break;
             }
-        }
- //   }
-
-    // todo: accept request (non-blocking)
- //   while (true) {
- //   }
+       }
+   //}
 
     free(es);
     return ;
-error:
-    exit(EXIT_FAILURE);
 }
-//WorkerProcess* worker_process_init() {
-//    WorkerProcess* worker = (WorkerProcess*) malloc(sizeof(WorkerProcess));
-//    check_mem(worker);
-    
-//    worker->pid = -1;
 
-//    return worker;
-//error:
-//    exit(EXIT_FAILURE);
-//}
+static void accept_client(EventSystem* es, TCPServer* server) {
+    // accept client
+    struct sockaddr_in client_addr;
+    socklen_t client_addr_size = sizeof(client_addr);
+
+    int client_fd = accept(server->event.fd, (struct sockaddr*) &client_addr, &client_addr_size);
+
+    if (client_fd == -1) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return;
+        else
+            log_err("Worker (PID: #%d) failed accepting connection", getpid());
+    }
+
+    log_info("Worker (PID: #%d) has accepted request from client #%d", getpid(), client_fd);
+
+    // todo: log client data
+
+    make_non_blocking(client_fd);
+
+    HTTPClient* client = http_client_init(client_fd);
+    es_add(es, client_fd, client, EPOLLIN);
+    log_info("Worker (PID: #%d) has added client #%d to epoll", getpid(), client_fd);
+
+    es_del(es, client_fd);
+    log_info("Worker (PID: #%d) has removed client #%d from epoll", getpid(), client_fd);
+
+    close(client_fd);
+    free(client);
+    log_info("Worker (PID: #%d) has closed connection with client #%d", getpid(), client_fd);
+}

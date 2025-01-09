@@ -62,7 +62,7 @@ static void spawn_worker_processes(MasterProcess* master) {
             log_info("Worker #%ld (PID: %d) started working\n\n", i + 1, w_pid);
 
             // todo: run ev loop
-            run_worker_process(w_pid, g_server);
+            run_worker_process(g_server);
 
             log_info("Worker #%ld (PID: %d) finished working\n\n", i + 1, w_pid);
 
