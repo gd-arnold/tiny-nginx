@@ -15,28 +15,30 @@
 #include "server.h"
 
 static void accept_client(EventSystem* es, TCPServer* server);
+static void receive_from_client(EventSystem* es, HTTPClient* client);
+static void send_to_client(EventSystem* es, HTTPClient* client);
 
 void run_worker_process(TCPServer* server) {
     EventSystem* es = event_system_init();
     es_add(es, server->event.fd, server, EPOLLIN);
 
-    // main event loop
+    // non-blocking event loop
     //while (true) {
         size_t nready = es_wait(es);
 
         for (size_t i = 0; i < nready; i++) {
-            EventBase* event = (EventBase*) es->events[i].data.ptr;
+            EventBase* event_data = (EventBase*) es->events[i].data.ptr;
             uint32_t events = es->events[i].events;
             
-            switch (event->type) {
+            switch (event_data->type) {
                 case SERVER_EVENT:
-                    accept_client(es, server);
+                    accept_client(es, (TCPServer*) event_data);
                     break;
                 case CLIENT_EVENT:
                     if (events & EPOLLIN) {
-                        // receive from client
+                        receive_from_client(es, (HTTPClient*) event_data);
                     } else if (events & EPOLLOUT) {
-                        // send to client
+                        send_to_client(es, (HTTPClient*) event_data);
                     }
                     break;
             }
@@ -48,7 +50,6 @@ void run_worker_process(TCPServer* server) {
 }
 
 static void accept_client(EventSystem* es, TCPServer* server) {
-    // accept client
     struct sockaddr_in client_addr;
     socklen_t client_addr_size = sizeof(client_addr);
 
@@ -77,4 +78,12 @@ static void accept_client(EventSystem* es, TCPServer* server) {
     close(client_fd);
     free(client);
     log_info("Worker (PID: #%d) closed connection with client #%d", getpid(), client_fd);
+}
+
+static void receive_from_client(EventSystem* es, HTTPClient* client) {
+    log_info("receiving from client #%d", client->event.fd);
+}
+
+static void send_to_client(EventSystem* es, HTTPClient* client) {
+    log_info("sending to client #%d", client->event.fd);
 }
