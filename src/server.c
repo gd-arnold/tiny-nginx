@@ -31,7 +31,12 @@ void tcp_server_start(TCPServer* server) {
     make_non_blocking(fd);
 
     // todo: read port from config file
-    uint16_t port = 3636;
+    uint16_t port = 3639;
+
+    // bypass TIME_WAIT
+    int opt = 1;
+    int or = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    check(or != -1, "Failed setting socket option (SO_REUSEADDR)");
 
     // server address on localhost:port
     struct sockaddr_in address;
