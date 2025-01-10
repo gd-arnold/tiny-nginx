@@ -13,8 +13,6 @@ static void spawn_worker_processes(MasterProcess* master);
 //static void handle_worker_exit(MasterProcess* master);
 //static void handle_shutdown(MasterProcess* master);
 
-static TCPServer* g_server = NULL;
-
 MasterProcess* master_process_init() {
     MasterProcess* master = (MasterProcess *)malloc(sizeof(MasterProcess));
     check_mem(master);
@@ -24,8 +22,8 @@ MasterProcess* master_process_init() {
     // todo: read workers count from config file
     master->workers_count = 1;
 
-    g_server = tcp_server_init();
-    tcp_server_start(g_server);
+    master->server = tcp_server_init();
+    tcp_server_start(master->server);
 
     return master;
 error:
@@ -43,8 +41,8 @@ void run_master_process(MasterProcess* master) {
 }
 
 void free_master_process(MasterProcess* master) {
-    tcp_server_stop(g_server);
-    free(g_server);
+    tcp_server_stop(master->server);
+    free(master->server);
     free(master);
 }
 
@@ -62,7 +60,7 @@ static void spawn_worker_processes(MasterProcess* master) {
             log_info("Worker #%ld (PID: %d) started working\n\n", i + 1, w_pid);
 
             // todo: run ev loop
-            run_worker_process(g_server);
+            run_worker_process(master->server);
 
             log_info("Worker #%ld (PID: %d) finished working\n\n", i + 1, w_pid);
 
