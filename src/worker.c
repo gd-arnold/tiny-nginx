@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <stdint.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -53,31 +54,40 @@ static void accept_client(EventSystem* es, TCPServer* server) {
     struct sockaddr_in client_addr;
     socklen_t client_addr_size = sizeof(client_addr);
 
-    int client_fd = accept(server->event.fd, (struct sockaddr*) &client_addr, &client_addr_size);
+    int fd = accept(server->event.fd, (struct sockaddr*) &client_addr, &client_addr_size);
 
-    if (client_fd == -1) {
+    if (fd == -1) {
         if (errno == EAGAIN || errno == EWOULDBLOCK)
             return;
         else
             log_err("Worker (PID: #%d) failed accepting connection", getpid());
     }
 
-    log_info("Worker (PID: #%d) accepted request from client #%d", getpid(), client_fd);
+    log_info("Worker (PID: #%d) accepted request from client #%d", getpid(), fd);
 
     // todo: log client data
 
-    make_non_blocking(client_fd);
+    make_non_blocking(fd);
 
-    HTTPClient* client = http_client_init(client_fd);
-    es_add(es, client_fd, client, EPOLLIN);
-    log_info("Worker (PID: #%d) added client #%d to epoll", getpid(), client_fd);
+    int opt = 1;
+    int or = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
+    check(or != -1, "Worker (PID: #%d) failed setting TCP_NODELAY on client #%d", getpid(), fd);
 
-    es_del(es, client_fd);
-    log_info("Worker (PID: #%d) removed client #%d from epoll", getpid(), client_fd);
+    HTTPClient* client = http_client_init(fd);
 
-    close(client_fd);
+    es_add(es, fd, client, EPOLLIN);
+    log_info("Worker (PID: #%d) added client #%d to epoll", getpid(), fd);
+
+    es_del(es, fd);
+    log_info("Worker (PID: #%d) removed client #%d from epoll", getpid(), fd);
+
+    close(fd);
     free(client);
-    log_info("Worker (PID: #%d) closed connection with client #%d", getpid(), client_fd);
+    log_info("Worker (PID: #%d) closed connection with client #%d", getpid(), fd);
+
+    return;
+error:
+    exit(EXIT_FAILURE);
 }
 
 static void receive_from_client(EventSystem* es, HTTPClient* client) {
