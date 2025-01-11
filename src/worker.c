@@ -1,3 +1,4 @@
+#include <asm-generic/errno.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -19,12 +20,14 @@ static void accept_client(EventSystem* es, TCPServer* server);
 static void receive_from_client(EventSystem* es, HTTPClient* client);
 static void send_to_client(EventSystem* es, HTTPClient* client);
 
+static void close_client(EventSystem* es, HTTPClient* client);
+
 void run_worker_process(TCPServer* server) {
     EventSystem* es = event_system_init();
     es_add(es, server->event.fd, server, EPOLLIN);
 
     // non-blocking event loop
-    //while (true) {
+    while (true) {
         size_t nready = es_wait(es);
 
         for (size_t i = 0; i < nready; i++) {
@@ -38,13 +41,14 @@ void run_worker_process(TCPServer* server) {
                 case CLIENT_EVENT:
                     if (events & EPOLLIN) {
                         receive_from_client(es, (HTTPClient*) event_data);
+                        return;
                     } else if (events & EPOLLOUT) {
                         send_to_client(es, (HTTPClient*) event_data);
                     }
                     break;
             }
        }
-   //}
+   }
 
     free(es);
     return ;
@@ -74,16 +78,8 @@ static void accept_client(EventSystem* es, TCPServer* server) {
     check(or != -1, "Worker (PID: #%d) failed setting TCP_NODELAY on client #%d", getpid(), fd);
 
     HTTPClient* client = http_client_init(fd);
-
     es_add(es, fd, client, EPOLLIN);
     log_info("Worker (PID: #%d) added client #%d to epoll", getpid(), fd);
-
-    es_del(es, fd);
-    log_info("Worker (PID: #%d) removed client #%d from epoll", getpid(), fd);
-
-    close(fd);
-    free(client);
-    log_info("Worker (PID: #%d) closed connection with client #%d", getpid(), fd);
 
     return;
 error:
@@ -91,9 +87,47 @@ error:
 }
 
 static void receive_from_client(EventSystem* es, HTTPClient* client) {
-    log_info("receiving from client #%d", client->event.fd);
+    ssize_t bytes_received = 
+        recv(client->event.fd, client->read + client->read_len,
+                MAX_CLIENT_READ_BUF - client->read_len - 1, 0);
+
+    if (bytes_received == -1) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return;
+        else
+            log_err("Worker (PID: #%d) failed receiving from client #%d", getpid(), client->event.fd);
+    }
+
+    // connection closed by client
+    if (bytes_received == 0) {
+        close_client(es, client);
+        return;
+    }
+
+    client->read_len += bytes_received;
+
+    if (client->read_len >= MAX_CLIENT_READ_BUF - 1) {
+        // todo: send 413 http
+        close_client(es, client);
+        return;
+    }
+
+    client->read[client->read_len] = '\0';
+    log_info("Worker (PID: #%d) received from client #%d", getpid(), client->event.fd);
+    log_info("%s", client->read);
+
+    if (strstr(client->read, "\r\n\r\n") != NULL) {
+        // todo: process request
+        close_client(es, client);
+    }
 }
 
 static void send_to_client(EventSystem* es, HTTPClient* client) {
     log_info("sending to client #%d", client->event.fd);
+}
+
+static void close_client(EventSystem* es, HTTPClient* client) {
+    es_del(es, client->event.fd);
+    close(client->event.fd);
+    free(client);
 }
