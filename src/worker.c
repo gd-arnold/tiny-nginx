@@ -24,7 +24,7 @@ static void close_client(EventSystem* es, HTTPClient* client);
 
 void run_worker_process(TCPServer* server) {
     EventSystem* es = event_system_init();
-    es_add(es, server->event.fd, server, EPOLLIN);
+    es_add(es, (EventBase*) server, EPOLLIN);
 
     // non-blocking event loop
     while (true) {
@@ -41,10 +41,10 @@ void run_worker_process(TCPServer* server) {
                 case CLIENT_EVENT:
                     if (events & EPOLLIN) {
                         receive_from_client(es, (HTTPClient*) event_data);
-                        return;
                     } else if (events & EPOLLOUT) {
                         send_to_client(es, (HTTPClient*) event_data);
                     }
+
                     break;
             }
        }
@@ -78,7 +78,7 @@ static void accept_client(EventSystem* es, TCPServer* server) {
     check(or != -1, "Worker (PID: #%d) failed setting TCP_NODELAY on client #%d", getpid(), fd);
 
     HTTPClient* client = http_client_init(fd);
-    es_add(es, fd, client, EPOLLIN);
+    es_add(es, (EventBase*) client, EPOLLIN);
     log_info("Worker (PID: #%d) added client #%d to epoll", getpid(), fd);
 
     return;

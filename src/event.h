@@ -18,8 +18,8 @@ typedef struct EventBase {
 
 EventSystem* event_system_init();
 
-void es_add(EventSystem* es, int fd, void* data, uint32_t events);
-void es_mod(EventSystem* es, int fd, uint32_t events);
+void es_add(EventSystem* es, EventBase* data, uint32_t events);
+void es_mod(EventSystem* es, EventBase* data, uint32_t events);
 void es_del(EventSystem* es, int fd);
 
 size_t es_wait(EventSystem* es);

@@ -20,12 +20,12 @@ error:
     exit(EXIT_FAILURE);
 }
 
-void es_add(EventSystem* es, int fd, void* data, uint32_t events) {
+void es_add(EventSystem* es, EventBase* data, uint32_t events) {
     struct epoll_event event;
     event.data.ptr = data;
     event.events = events;
 
-    int res = epoll_ctl(es->epoll_fd, EPOLL_CTL_ADD, fd, &event);
+    int res = epoll_ctl(es->epoll_fd, EPOLL_CTL_ADD, data->fd, &event);
     check(res != -1, "Failed to add epoll event");
 
     return;
@@ -33,12 +33,12 @@ error:
     exit(EXIT_FAILURE);
 }
 
-void es_mod(EventSystem* es, int fd, uint32_t events) {
+void es_mod(EventSystem* es, EventBase* data, uint32_t events) {
     struct epoll_event event;
-    event.data.fd = fd;
+    event.data.ptr = data;
     event.events = events;
 
-    int res = epoll_ctl(es->epoll_fd, EPOLL_CTL_MOD, fd, &event);
+    int res = epoll_ctl(es->epoll_fd, EPOLL_CTL_MOD, data->fd, &event);
     check(res != -1, "Failed to modify epoll event");
 
     return;
