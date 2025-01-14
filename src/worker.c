@@ -117,13 +117,34 @@ static void receive_from_client(EventSystem* es, HTTPClient* client) {
     log_info("%s", client->read);
 
     if (strstr(client->read, "\r\n\r\n") != NULL) {
-        // todo: process request
-        close_client(es, client);
+        // todo: parse http request
+        const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ntest";
+        client->write_len = strlen(response);
+        memcpy(client->write, response, client->write_len);
+
+        es_mod(es, (EventBase*) client, EPOLLOUT);
     }
 }
 
 static void send_to_client(EventSystem* es, HTTPClient* client) {
+    ssize_t bytes_sent =
+        send(client->event.fd, client->write + client->write_sent, 
+                client->write_len, 0);
+
     log_info("sending to client #%d", client->event.fd);
+
+    if (bytes_sent == -1) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return;
+        else
+            log_err("Worker (PID: #%d) failed receiving from client #%d", getpid(), client->event.fd);
+    }
+
+    client->write_sent += bytes_sent;
+
+    if (client->write_sent == client->write_len) {
+        close_client(es, client);
+    }
 }
 
 static void close_client(EventSystem* es, HTTPClient* client) {
