@@ -4,12 +4,14 @@
 #include "dbg.h"
 #include "event.h"
 
-HTTPClient* http_client_init(int fd) {
+HTTPClient* http_client_init(int fd, ClientState state) {
     HTTPClient* client = (HTTPClient*) malloc(sizeof(HTTPClient));
     check_mem(client);
 
     client->event.fd = fd;
     client->event.type = CLIENT_EVENT;
+
+    client->state = state;
 
     memset(client->request, 0, sizeof(client->request));
     client->request_len = 0;

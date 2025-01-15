@@ -19,6 +19,8 @@
 static void accept_client(EventSystem* es, TCPServer* server);
 static void receive_from_client(EventSystem* es, HTTPClient* client);
 static void send_to_client(EventSystem* es, HTTPClient* client);
+static void send_headers(EventSystem* es, HTTPClient* client);
+static void send_file(EventSystem* es, HTTPClient* client);
 
 static void close_client(EventSystem* es, HTTPClient* client);
 
@@ -79,7 +81,7 @@ static void accept_client(EventSystem* es, TCPServer* server) {
     int or = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
     check(or != -1, "Worker (PID: #%d) failed setting TCP_NODELAY on client #%d", getpid(), fd);
 
-    HTTPClient* client = http_client_init(fd);
+    HTTPClient* client = http_client_init(fd, CLIENT_READING_REQUEST);
     es_add(es, (EventBase*) client, EPOLLIN);
     log_info("Worker (PID: #%d) added client #%d to epoll", getpid(), fd);
 
@@ -121,14 +123,30 @@ static void receive_from_client(EventSystem* es, HTTPClient* client) {
     if (strstr(client->request, "\r\n\r\n") != NULL) {
         // todo: parse http request
         const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ntest";
+
         client->headers_len = strlen(response);
         memcpy(client->headers, response, client->headers_len);
+
+        client->state = CLIENT_SENDING_HEADERS;
 
         es_mod(es, (EventBase*) client, EPOLLOUT);
     }
 }
 
 static void send_to_client(EventSystem* es, HTTPClient* client) {
+    switch (client->state) {
+        case CLIENT_SENDING_HEADERS:
+            return send_headers(es, client);
+        case CLIENT_SENDING_FILE:
+            return send_file(es, client);
+        case CLIENT_CLOSING:
+            return close_client(es, client);
+        default:
+            log_err("Invalid client #%d state %d", client->event.fd, getpid());
+    }
+}
+
+static void send_headers(EventSystem* es, HTTPClient* client) {
     ssize_t bytes_sent =
         send(client->event.fd, client->headers + client->headers_sent, 
                 client->headers_len, 0);
@@ -145,8 +163,17 @@ static void send_to_client(EventSystem* es, HTTPClient* client) {
     client->headers_sent += bytes_sent;
 
     if (client->headers_sent == client->headers_len) {
-        close_client(es, client);
+        // headers done sending, now send file
+        client->state = CLIENT_SENDING_FILE;
+        send_to_client(es, client);
     }
+}
+
+static void send_file(EventSystem* es, HTTPClient* client) {
+    // todo: send file
+    log_info("sending file..");
+    client->state = CLIENT_CLOSING;
+    send_to_client(es, client);
 }
 
 static void close_client(EventSystem* es, HTTPClient* client) {
