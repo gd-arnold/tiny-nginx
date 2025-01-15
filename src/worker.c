@@ -43,6 +43,8 @@ void run_worker_process(TCPServer* server) {
                         receive_from_client(es, (HTTPClient*) event_data);
                     } else if (events & EPOLLOUT) {
                         send_to_client(es, (HTTPClient*) event_data);
+                        free(es);
+                        return;
                     }
 
                     break;
@@ -88,8 +90,8 @@ error:
 
 static void receive_from_client(EventSystem* es, HTTPClient* client) {
     ssize_t bytes_received = 
-        recv(client->event.fd, client->read + client->read_len,
-                MAX_CLIENT_READ_BUF - client->read_len - 1, 0);
+        recv(client->event.fd, client->request + client->request_len,
+                MAX_CLIENT_REQUEST_BUFFER - client->request_len - 1, 0);
 
     if (bytes_received == -1) {
         if (errno == EAGAIN || errno == EWOULDBLOCK)
@@ -104,23 +106,23 @@ static void receive_from_client(EventSystem* es, HTTPClient* client) {
         return;
     }
 
-    client->read_len += bytes_received;
+    client->request_len += bytes_received;
 
-    if (client->read_len >= MAX_CLIENT_READ_BUF - 1) {
+    if (client->request_len >= MAX_CLIENT_REQUEST_BUFFER - 1) {
         // todo: send 413 http
         close_client(es, client);
         return;
     }
 
-    client->read[client->read_len] = '\0';
+    client->request[client->request_len] = '\0';
     log_info("Worker (PID: #%d) received from client #%d", getpid(), client->event.fd);
-    log_info("%s", client->read);
+    log_info("%s", client->request);
 
-    if (strstr(client->read, "\r\n\r\n") != NULL) {
+    if (strstr(client->request, "\r\n\r\n") != NULL) {
         // todo: parse http request
         const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ntest";
-        client->write_len = strlen(response);
-        memcpy(client->write, response, client->write_len);
+        client->headers_len = strlen(response);
+        memcpy(client->headers, response, client->headers_len);
 
         es_mod(es, (EventBase*) client, EPOLLOUT);
     }
@@ -128,8 +130,8 @@ static void receive_from_client(EventSystem* es, HTTPClient* client) {
 
 static void send_to_client(EventSystem* es, HTTPClient* client) {
     ssize_t bytes_sent =
-        send(client->event.fd, client->write + client->write_sent, 
-                client->write_len, 0);
+        send(client->event.fd, client->headers + client->headers_sent, 
+                client->headers_len, 0);
 
     log_info("sending to client #%d", client->event.fd);
 
@@ -140,9 +142,9 @@ static void send_to_client(EventSystem* es, HTTPClient* client) {
             log_err("Worker (PID: #%d) failed receiving from client #%d", getpid(), client->event.fd);
     }
 
-    client->write_sent += bytes_sent;
+    client->headers_sent += bytes_sent;
 
-    if (client->write_sent == client->write_len) {
+    if (client->headers_sent == client->headers_len) {
         close_client(es, client);
     }
 }

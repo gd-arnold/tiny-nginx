@@ -11,12 +11,12 @@ HTTPClient* http_client_init(int fd) {
     client->event.fd = fd;
     client->event.type = CLIENT_EVENT;
 
-    memset(client->read, 0, sizeof(client->read));
-    client->read_len = 0;
+    memset(client->request, 0, sizeof(client->request));
+    client->request_len = 0;
 
-    memset(client->write, 0, sizeof(client->write));
-    client->write_len = 0;
-    client->write_sent = 0;
+    memset(client->headers, 0, sizeof(client->headers));
+    client->headers_len = 0;
+    client->headers_sent = 0;
 
     return client;
 error:
