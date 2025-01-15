@@ -20,6 +20,8 @@ HTTPClient* http_client_init(int fd, ClientState state) {
     client->headers_len = 0;
     client->headers_sent = 0;
 
+    client->http_error = false;
+
     return client;
 error:
     exit(EXIT_FAILURE);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stdlib.h>
 
 #include "event.h"
@@ -27,7 +28,7 @@ typedef struct HTTPClient {
     size_t headers_len;
     size_t headers_sent;
 
-    // todo: http request state
+    bool http_error;
 } HTTPClient;
 
 HTTPClient* http_client_init(int fd, ClientState state);

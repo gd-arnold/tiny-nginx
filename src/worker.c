@@ -1,6 +1,7 @@
 #include <asm-generic/errno.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <stdbool.h>
 #include <netinet/in.h>
@@ -26,6 +27,9 @@ static void send_headers(EventSystem* es, HTTPClient* client);
 static void send_file(EventSystem* es, HTTPClient* client);
 
 static void close_client(EventSystem* es, HTTPClient* client);
+
+static void parse_http_request(EventSystem* es, HTTPClient* client);
+static void set_http_error_response(EventSystem* es, HTTPClient* client, const char* type);
 
 void run_worker_process(TCPServer* server) {
     EventSystem* es = event_system_init();
@@ -148,14 +152,7 @@ static void receive_request(EventSystem* es, HTTPClient* client) {
     log_info("%s", client->request);
 
     if (strstr(client->request, "\r\n\r\n") != NULL) {
-        // todo: parse http request
-        const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ntest";
-
-        client->headers_len = strlen(response);
-        memcpy(client->headers, response, client->headers_len);
-
-        client->state = CLIENT_SENDING_HEADERS;
-        es_mod(es, (EventBase*) client, EPOLLOUT);
+        parse_http_request(es, client);
     }
 }
 
@@ -177,7 +174,11 @@ static void send_headers(EventSystem* es, HTTPClient* client) {
 
     if (client->headers_sent == client->headers_len) {
         // headers done sending, now send file
-        client->state = CLIENT_SENDING_FILE;
+        if (client->http_error)
+            client->state = CLIENT_CLOSING;
+        else
+            client->state = CLIENT_SENDING_FILE;
+
         send_to_client(es, client);
     }
 }
@@ -193,4 +194,48 @@ static void close_client(EventSystem* es, HTTPClient* client) {
     es_del(es, client->event.fd);
     close(client->event.fd);
     free(client);
+}
+
+static void parse_http_request(EventSystem* es, HTTPClient* client) {
+    char* request_line = strtok(client->request, "\r\n");
+
+    if (request_line == NULL)
+        return set_http_error_response(es, client, "400 Bad Request");
+
+    const char* method = strtok(request_line, " ");
+    const char* path = strtok(NULL, " ");
+    const char* version = strtok(NULL, " ");
+
+    if (method == NULL || path == NULL || version == NULL)
+        return set_http_error_response(es, client, "400 Bad Request");
+
+    if (strncmp(method, "GET", 3) != 0)
+        return set_http_error_response(es, client, "501 Not Implemented");
+
+    if (strncmp(version, "HTTP/1.", 7) != 0)
+        return set_http_error_response(es, client, "505 HTTP Version Not Supported");
+
+    // todo: process path
+
+    const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ntest";
+    client->headers_len = strlen(response);
+    memcpy(client->headers, response, client->headers_len);
+
+    client->state = CLIENT_SENDING_HEADERS;
+    es_mod(es, (EventBase*) client, EPOLLOUT);
+}
+
+static void set_http_error_response(EventSystem* es, HTTPClient* client, const char* type) {
+    client->http_error = true;
+
+    snprintf(client->headers, sizeof(client->headers),
+            "HTTP/1.1 %s\r\n"
+            "Content-Type: text/plain\r\n"
+            "Content-Length: 0\r\n"
+            "Connection: close\r\n\r\n",
+            type);
+    client->headers_len = strlen(client->headers);
+
+    client->state = CLIENT_SENDING_HEADERS;
+    es_mod(es, (EventBase*) client, EPOLLOUT);
 }
