@@ -18,6 +18,9 @@
 
 static void accept_client(EventSystem* es, TCPServer* server);
 static void receive_from_client(EventSystem* es, HTTPClient* client);
+
+static void receive_request(EventSystem* es, HTTPClient* client);
+
 static void send_to_client(EventSystem* es, HTTPClient* client);
 static void send_headers(EventSystem* es, HTTPClient* client);
 static void send_file(EventSystem* es, HTTPClient* client);
@@ -81,7 +84,7 @@ static void accept_client(EventSystem* es, TCPServer* server) {
     int or = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
     check(or != -1, "Worker (PID: #%d) failed setting TCP_NODELAY on client #%d", getpid(), fd);
 
-    HTTPClient* client = http_client_init(fd, CLIENT_READING_REQUEST);
+    HTTPClient* client = http_client_init(fd, CLIENT_RECEIVING_REQUEST);
     es_add(es, (EventBase*) client, EPOLLIN);
     log_info("Worker (PID: #%d) added client #%d to epoll", getpid(), fd);
 
@@ -91,6 +94,29 @@ error:
 }
 
 static void receive_from_client(EventSystem* es, HTTPClient* client) {
+    switch (client->state) {
+        case CLIENT_RECEIVING_REQUEST:
+            return receive_request(es, client);
+        default:
+            log_err("Invalid client (fd: %d) state %d", client->event.fd, getpid());
+    }
+
+}
+
+static void send_to_client(EventSystem* es, HTTPClient* client) {
+    switch (client->state) {
+        case CLIENT_SENDING_HEADERS:
+            return send_headers(es, client);
+        case CLIENT_SENDING_FILE:
+            return send_file(es, client);
+        case CLIENT_CLOSING:
+            return close_client(es, client);
+        default:
+            log_err("Invalid client (fd: %d) state %d", client->event.fd, getpid());
+    }
+}
+
+static void receive_request(EventSystem* es, HTTPClient* client) {
     ssize_t bytes_received = 
         recv(client->event.fd, client->request + client->request_len,
                 MAX_CLIENT_REQUEST_BUFFER - client->request_len - 1, 0);
@@ -112,6 +138,7 @@ static void receive_from_client(EventSystem* es, HTTPClient* client) {
 
     if (client->request_len >= MAX_CLIENT_REQUEST_BUFFER - 1) {
         // todo: send 413 http
+        client->state = CLIENT_CLOSING;
         close_client(es, client);
         return;
     }
@@ -128,21 +155,7 @@ static void receive_from_client(EventSystem* es, HTTPClient* client) {
         memcpy(client->headers, response, client->headers_len);
 
         client->state = CLIENT_SENDING_HEADERS;
-
         es_mod(es, (EventBase*) client, EPOLLOUT);
-    }
-}
-
-static void send_to_client(EventSystem* es, HTTPClient* client) {
-    switch (client->state) {
-        case CLIENT_SENDING_HEADERS:
-            return send_headers(es, client);
-        case CLIENT_SENDING_FILE:
-            return send_file(es, client);
-        case CLIENT_CLOSING:
-            return close_client(es, client);
-        default:
-            log_err("Invalid client #%d state %d", client->event.fd, getpid());
     }
 }
 
