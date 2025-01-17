@@ -133,27 +133,20 @@ static void receive_request(EventSystem* es, HTTPClient* client) {
     }
 
     // connection closed by client
-    if (bytes_received == 0) {
-        close_client(es, client);
-        return;
-    }
+    if (bytes_received == 0)
+        return close_client(es, client);
 
     client->request_len += bytes_received;
 
-    if (client->request_len >= MAX_CLIENT_REQUEST_BUFFER - 1) {
-        // todo: send 413 http
-        client->state = CLIENT_CLOSING;
-        close_client(es, client);
-        return;
-    }
+    if (client->request_len >= MAX_CLIENT_REQUEST_BUFFER - 1)
+        return set_http_error_response(es, client, "413 Content Too Large");
 
     client->request[client->request_len] = '\0';
     log_info("Worker (PID: #%d) received from client #%d", getpid(), client->event.fd);
     log_info("%s", client->request);
 
-    if (strstr(client->request, "\r\n\r\n") != NULL) {
-        parse_http_request(es, client);
-    }
+    if (strstr(client->request, "\r\n\r\n") != NULL)
+        return parse_http_request(es, client);
 }
 
 static void send_headers(EventSystem* es, HTTPClient* client) {
