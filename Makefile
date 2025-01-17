@@ -2,7 +2,7 @@ TARGET = tinynginx
 
 CC = gcc
 DEP_FLAGS = -MP -MD
-C_FLAGS = -std=c11 -g -Wall -Werror -O1
+C_FLAGS = -std=c11 -g -Wall -Werror -O1 -DPUBLIC_DIR="\"$(realpath ./public)\""
 
 BUILD_DIR = build
 SRC_DIR = src
