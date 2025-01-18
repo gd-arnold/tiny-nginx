@@ -31,7 +31,7 @@ static void close_client(EventSystem* es, HTTPClient* client);
 static void parse_http_request(EventSystem* es, HTTPClient* client);
 static void set_http_error_response(EventSystem* es, HTTPClient* client, const char* type);
 
-static void url_decode(const char* src, char* dst, size_t dst_size);
+static void decode_url(const char* src, char* dst, size_t dst_size);
 
 void run_worker_process(TCPServer* server) {
     EventSystem* es = event_system_init();
@@ -212,7 +212,7 @@ static void parse_http_request(EventSystem* es, HTTPClient* client) {
 
     // todo: process path
     char decoded_path[MAX_PATH_BUFFER];
-    url_decode(path, decoded_path, sizeof(decoded_path));
+    decode_url(path, decoded_path, sizeof(decoded_path));
     log_info("decoded path: %s", decoded_path);
 
     const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ntest";
@@ -238,7 +238,7 @@ static void set_http_error_response(EventSystem* es, HTTPClient* client, const c
     es_mod(es, (EventBase*) client, EPOLLOUT);
 }
 
-static void url_decode(const char* src, char* dst, size_t dst_size) {
+static void decode_url(const char* src, char* dst, size_t dst_size) {
     memset(dst, 0, dst_size);
     size_t src_len = strlen(src);
 
