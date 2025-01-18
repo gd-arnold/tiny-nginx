@@ -8,6 +8,8 @@
 #define MAX_CLIENT_REQUEST_BUFFER 4096
 #define MAX_CLIENT_HEADERS_BUFFER 1024
 
+#define MAX_PATH_BUFFER 512
+
 typedef enum ClientState {
     CLIENT_RECEIVING_REQUEST,
     CLIENT_SENDING_HEADERS,
@@ -29,6 +31,8 @@ typedef struct HTTPClient {
     size_t headers_sent;
 
     bool http_error;
+
+    char path[MAX_PATH_BUFFER];
 } HTTPClient;
 
 HTTPClient* http_client_init(int fd, ClientState state);

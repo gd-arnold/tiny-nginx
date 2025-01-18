@@ -20,7 +20,7 @@ MasterProcess* master_process_init() {
     master->pid = getpid();
     memset(master->w_pids, 0, sizeof(master->w_pids));
     // todo: read workers count from config file
-    master->workers_count = 3;
+    master->workers_count = 1;
 
     master->server = tcp_server_init();
     tcp_server_start(master->server);

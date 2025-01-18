@@ -31,6 +31,8 @@ static void close_client(EventSystem* es, HTTPClient* client);
 static void parse_http_request(EventSystem* es, HTTPClient* client);
 static void set_http_error_response(EventSystem* es, HTTPClient* client, const char* type);
 
+static void url_decode(const char* src, char* dst, size_t dst_size);
+
 void run_worker_process(TCPServer* server) {
     EventSystem* es = event_system_init();
     es_add(es, (EventBase*) server, EPOLLIN);
@@ -209,6 +211,9 @@ static void parse_http_request(EventSystem* es, HTTPClient* client) {
         return set_http_error_response(es, client, "505 HTTP Version Not Supported");
 
     // todo: process path
+    char decoded_path[MAX_PATH_BUFFER];
+    url_decode(path, decoded_path, sizeof(decoded_path));
+    log_info("decoded path: %s", decoded_path);
 
     const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ntest";
     client->headers_len = strlen(response);
@@ -231,4 +236,22 @@ static void set_http_error_response(EventSystem* es, HTTPClient* client, const c
 
     client->state = CLIENT_SENDING_HEADERS;
     es_mod(es, (EventBase*) client, EPOLLOUT);
+}
+
+static void url_decode(const char* src, char* dst, size_t dst_size) {
+    memset(dst, 0, dst_size);
+    size_t src_len = strlen(src);
+
+    for (size_t i = 0, j = 0; i < src_len && j < dst_size - 1; i++, j++) {
+        if (src[i] == '%' && i + 2 < src_len) {
+            unsigned char byte;
+            sscanf(src + i + 1, "%2hhx", &byte); // decode %-encoded bytes
+            dst[j] = byte;
+            i += 2;
+        } else if (src[i] == '+') {
+            dst[j] = ' '; // convert '+' to space
+        } else {
+            dst[j] = src[i];
+        }
+    }
 }
