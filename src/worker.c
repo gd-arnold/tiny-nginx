@@ -10,6 +10,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <sys/epoll.h>
+#include <stdlib.h>
 
 #include "worker.h"
 #include "client.h"
@@ -31,6 +32,7 @@ static void close_client(EventSystem* es, HTTPClient* client);
 static void parse_http_request(EventSystem* es, HTTPClient* client);
 static void set_http_error_response(EventSystem* es, HTTPClient* client, const char* type);
 
+static void resolve_path(EventSystem* es, HTTPClient* client, const char* path);
 static void decode_url(const char* src, char* dst, size_t dst_size);
 
 void run_worker_process(TCPServer* server) {
@@ -210,17 +212,19 @@ static void parse_http_request(EventSystem* es, HTTPClient* client) {
     if (strncmp(version, "HTTP/1.", 7) != 0)
         return set_http_error_response(es, client, "505 HTTP Version Not Supported");
 
-    // todo: process path
-    char decoded_path[MAX_PATH_BUFFER];
-    decode_url(path, decoded_path, sizeof(decoded_path));
-    log_info("decoded path: %s", decoded_path);
 
-    const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ntest";
-    client->headers_len = strlen(response);
-    memcpy(client->headers, response, client->headers_len);
+    resolve_path(es, client, path);
 
-    client->state = CLIENT_SENDING_HEADERS;
-    es_mod(es, (EventBase*) client, EPOLLOUT);
+    if (!client->http_error) {
+        log_info("resolved path: %s", client->path);
+
+        const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ntest";
+        client->headers_len = strlen(response);
+        memcpy(client->headers, response, client->headers_len);
+
+        client->state = CLIENT_SENDING_HEADERS;
+        es_mod(es, (EventBase*) client, EPOLLOUT);
+    }
 }
 
 static void set_http_error_response(EventSystem* es, HTTPClient* client, const char* type) {
@@ -236,6 +240,30 @@ static void set_http_error_response(EventSystem* es, HTTPClient* client, const c
 
     client->state = CLIENT_SENDING_HEADERS;
     es_mod(es, (EventBase*) client, EPOLLOUT);
+}
+
+static void resolve_path(EventSystem* es, HTTPClient* client, const char* path) {
+    char decoded_path[MAX_PATH_BUFFER];
+    char full_path[MAX_PATH_BUFFER];
+
+    decode_url(path, decoded_path, sizeof(decoded_path));
+
+    size_t public_dir_len = strlen(PUBLIC_DIR);
+    size_t decoded_path_len = strlen(decoded_path);
+
+    if (public_dir_len + 1 + decoded_path_len >= MAX_PATH_BUFFER)
+        return set_http_error_response(es, client, "414 URI Too Long");
+    
+    int written = snprintf(full_path, sizeof(full_path), "%s/%s", PUBLIC_DIR, decoded_path);
+    if (written < 0 || (size_t)written >= sizeof(full_path))
+       return set_http_error_response(es, client, "414 URI Too Long");
+
+    if (realpath(full_path, client->path) == NULL)
+        return set_http_error_response(es, client, "404 Not Found");
+
+    if (strncmp(client->path, PUBLIC_DIR, public_dir_len) != 0 || 
+            (client->path[public_dir_len] != '\0' && client->path[public_dir_len] != '/'))
+        return set_http_error_response(es, client, "404 Not Found");
 }
 
 static void decode_url(const char* src, char* dst, size_t dst_size) {
