@@ -256,6 +256,11 @@ static void resolve_path(EventSystem* es, HTTPClient* client, const char* path) 
 
     decode_url(path, decoded_path, sizeof(decoded_path));
 
+    // append index.html to directories
+    if (decoded_path[strlen(decoded_path) - 1] == '/') {
+        strncat(decoded_path, "index.html", sizeof(decoded_path) - strlen(decoded_path) - 1);
+    }
+
     size_t public_dir_len = strlen(PUBLIC_DIR);
     size_t decoded_path_len = strlen(decoded_path);
 
