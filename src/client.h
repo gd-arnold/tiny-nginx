@@ -32,7 +32,7 @@ typedef struct HTTPClient {
 
     bool http_error;
 
-    char path[MAX_PATH_BUFFER];
+    int file_fd;
 } HTTPClient;
 
 HTTPClient* http_client_init(int fd, ClientState state);

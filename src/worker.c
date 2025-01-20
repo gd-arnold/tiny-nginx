@@ -1,8 +1,10 @@
+#include <sys/stat.h> 
 #include <asm-generic/errno.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <stdbool.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -11,6 +13,7 @@
 #include <arpa/inet.h>
 #include <sys/epoll.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "worker.h"
 #include "client.h"
@@ -186,12 +189,16 @@ static void send_headers(EventSystem* es, HTTPClient* client) {
 
 static void send_file(EventSystem* es, HTTPClient* client) {
     // todo: send file
-    log_info("sending file..");
+    log_info("sending file with fd: %d", client->file_fd);
+    log_info("closing file ..");
+    close(client->file_fd);
+
     client->state = CLIENT_CLOSING;
     send_to_client(es, client);
 }
 
 static void close_client(EventSystem* es, HTTPClient* client) {
+    log_info("closing client");
     es_del(es, client->event.fd);
     close(client->event.fd);
     free(client);
@@ -220,8 +227,6 @@ static void parse_http_request(EventSystem* es, HTTPClient* client) {
     resolve_path(es, client, path);
 
     if (!client->http_error) {
-        log_info("resolved path: %s", client->path);
-
         const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ntest";
         client->headers_len = strlen(response);
         memcpy(client->headers, response, client->headers_len);
@@ -243,9 +248,11 @@ static void set_http_error_headers(EventSystem* es, HTTPClient* client, const ch
 static void resolve_path(EventSystem* es, HTTPClient* client, const char* path) {
     char decoded_path[MAX_PATH_BUFFER];
     char full_path[MAX_PATH_BUFFER];
+    char resolved_path[MAX_PATH_BUFFER];
 
     memset(decoded_path, 0, sizeof(decoded_path));
     memset(full_path, 0, sizeof(full_path));
+    memset(resolved_path, 0, sizeof(resolved_path));
 
     decode_url(path, decoded_path, sizeof(decoded_path));
 
@@ -259,12 +266,24 @@ static void resolve_path(EventSystem* es, HTTPClient* client, const char* path) 
     if (written < 0 || (size_t)written >= sizeof(full_path))
        return set_http_error_headers(es, client, "414 URI Too Long");
 
-    if (realpath(full_path, client->path) == NULL)
+    if (realpath(full_path, resolved_path) == NULL)
         return set_http_error_headers(es, client, "404 Not Found");
 
-    if (strncmp(client->path, PUBLIC_DIR, public_dir_len) != 0 || 
-            (client->path[public_dir_len] != '\0' && client->path[public_dir_len] != '/'))
+    if (strncmp(resolved_path, PUBLIC_DIR, public_dir_len) != 0 || 
+            (resolved_path[public_dir_len] != '\0' && resolved_path[public_dir_len] != '/'))
         return set_http_error_headers(es, client, "404 Not Found");
+
+    int file_fd = open(resolved_path, O_RDONLY);
+    if (file_fd == -1)
+        return set_http_error_headers(es, client, "404 Not Found");
+
+    struct stat st;
+    if (fstat(file_fd, &st) == -1 || !S_ISREG(st.st_mode)) {
+        close(file_fd); 
+        return set_http_error_headers(es, client, "404 Not Found");
+    }
+
+    client->file_fd = file_fd;
 }
 
 static void decode_url(const char* src, char* dst, size_t dst_size) {

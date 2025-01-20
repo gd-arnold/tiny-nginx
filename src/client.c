@@ -22,6 +22,8 @@ HTTPClient* http_client_init(int fd, ClientState state) {
 
     client->http_error = false;
 
+    client->file_fd = 0;
+
     return client;
 error:
     exit(EXIT_FAILURE);
