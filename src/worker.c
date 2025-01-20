@@ -30,7 +30,7 @@ static void send_file(EventSystem* es, HTTPClient* client);
 static void close_client(EventSystem* es, HTTPClient* client);
 
 static void parse_http_request(EventSystem* es, HTTPClient* client);
-static void set_http_error_response(EventSystem* es, HTTPClient* client, const char* type);
+static void set_http_error_headers(EventSystem* es, HTTPClient* client, const char* type);
 
 static void resolve_path(EventSystem* es, HTTPClient* client, const char* path);
 static void decode_url(const char* src, char* dst, size_t dst_size);
@@ -143,14 +143,18 @@ static void receive_request(EventSystem* es, HTTPClient* client) {
     client->request_len += bytes_received;
 
     if (client->request_len >= MAX_CLIENT_REQUEST_BUFFER - 1)
-        return set_http_error_response(es, client, "413 Content Too Large");
+        return set_http_error_headers(es, client, "413 Content Too Large");
 
     client->request[client->request_len] = '\0';
     log_info("Worker (PID: #%d) received from client #%d", getpid(), client->event.fd);
     log_info("%s", client->request);
 
-    if (strstr(client->request, "\r\n\r\n") != NULL)
-        return parse_http_request(es, client);
+    if (strstr(client->request, "\r\n\r\n") != NULL) {
+        parse_http_request(es, client);
+
+        es_mod(es, (EventBase*) client, EPOLLOUT);
+        client->state = CLIENT_SENDING_HEADERS;
+    }
 }
 
 static void send_headers(EventSystem* es, HTTPClient* client) {
@@ -197,20 +201,20 @@ static void parse_http_request(EventSystem* es, HTTPClient* client) {
     char* request_line = strtok(client->request, "\r\n");
 
     if (request_line == NULL)
-        return set_http_error_response(es, client, "400 Bad Request");
+        return set_http_error_headers(es, client, "400 Bad Request");
 
     const char* method = strtok(request_line, " ");
     const char* path = strtok(NULL, " ");
     const char* version = strtok(NULL, " ");
 
     if (method == NULL || path == NULL || version == NULL)
-        return set_http_error_response(es, client, "400 Bad Request");
+        return set_http_error_headers(es, client, "400 Bad Request");
 
     if (strncmp(method, "GET", 3) != 0)
-        return set_http_error_response(es, client, "501 Not Implemented");
+        return set_http_error_headers(es, client, "501 Not Implemented");
 
     if (strncmp(version, "HTTP/1.", 7) != 0)
-        return set_http_error_response(es, client, "505 HTTP Version Not Supported");
+        return set_http_error_headers(es, client, "505 HTTP Version Not Supported");
 
 
     resolve_path(es, client, path);
@@ -221,13 +225,10 @@ static void parse_http_request(EventSystem* es, HTTPClient* client) {
         const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ntest";
         client->headers_len = strlen(response);
         memcpy(client->headers, response, client->headers_len);
-
-        client->state = CLIENT_SENDING_HEADERS;
-        es_mod(es, (EventBase*) client, EPOLLOUT);
     }
 }
 
-static void set_http_error_response(EventSystem* es, HTTPClient* client, const char* type) {
+static void set_http_error_headers(EventSystem* es, HTTPClient* client, const char* type) {
     client->http_error = true;
 
     snprintf(client->headers, sizeof(client->headers),
@@ -237,14 +238,14 @@ static void set_http_error_response(EventSystem* es, HTTPClient* client, const c
             "Connection: close\r\n\r\n",
             type);
     client->headers_len = strlen(client->headers);
-
-    client->state = CLIENT_SENDING_HEADERS;
-    es_mod(es, (EventBase*) client, EPOLLOUT);
 }
 
 static void resolve_path(EventSystem* es, HTTPClient* client, const char* path) {
     char decoded_path[MAX_PATH_BUFFER];
     char full_path[MAX_PATH_BUFFER];
+
+    memset(decoded_path, 0, sizeof(decoded_path));
+    memset(full_path, 0, sizeof(full_path));
 
     decode_url(path, decoded_path, sizeof(decoded_path));
 
@@ -252,22 +253,21 @@ static void resolve_path(EventSystem* es, HTTPClient* client, const char* path) 
     size_t decoded_path_len = strlen(decoded_path);
 
     if (public_dir_len + 1 + decoded_path_len >= MAX_PATH_BUFFER)
-        return set_http_error_response(es, client, "414 URI Too Long");
+        return set_http_error_headers(es, client, "414 URI Too Long");
     
     int written = snprintf(full_path, sizeof(full_path), "%s/%s", PUBLIC_DIR, decoded_path);
     if (written < 0 || (size_t)written >= sizeof(full_path))
-       return set_http_error_response(es, client, "414 URI Too Long");
+       return set_http_error_headers(es, client, "414 URI Too Long");
 
     if (realpath(full_path, client->path) == NULL)
-        return set_http_error_response(es, client, "404 Not Found");
+        return set_http_error_headers(es, client, "404 Not Found");
 
     if (strncmp(client->path, PUBLIC_DIR, public_dir_len) != 0 || 
             (client->path[public_dir_len] != '\0' && client->path[public_dir_len] != '/'))
-        return set_http_error_response(es, client, "404 Not Found");
+        return set_http_error_headers(es, client, "404 Not Found");
 }
 
 static void decode_url(const char* src, char* dst, size_t dst_size) {
-    memset(dst, 0, dst_size);
     size_t src_len = strlen(src);
 
     for (size_t i = 0, j = 0; i < src_len && j < dst_size - 1; i++, j++) {
