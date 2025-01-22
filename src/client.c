@@ -22,7 +22,9 @@ HTTPClient* http_client_init(int fd, ClientState state) {
 
     client->http_error = false;
 
-    client->file_fd = 0;
+    client->file_fd = -1;
+    client->file_offset = 0;
+    client->file_size = 0;
 
     return client;
 error:

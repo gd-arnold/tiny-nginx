@@ -10,6 +10,7 @@
 #include <netinet/tcp.h>
 #include <stdint.h>
 #include <sys/socket.h>
+#include <sys/sendfile.h>
 #include <arpa/inet.h>
 #include <sys/epoll.h>
 #include <stdlib.h>
@@ -171,7 +172,7 @@ static void send_headers(EventSystem* es, HTTPClient* client) {
         if (errno == EAGAIN || errno == EWOULDBLOCK)
             return;
         else
-            log_err("Worker (PID: #%d) failed receiving from client #%d", getpid(), client->event.fd);
+            log_err("Worker (PID: #%d) failed sending to client #%d", getpid(), client->event.fd);
     }
 
     client->headers_sent += bytes_sent;
@@ -188,17 +189,30 @@ static void send_headers(EventSystem* es, HTTPClient* client) {
 }
 
 static void send_file(EventSystem* es, HTTPClient* client) {
-    // todo: send file
-    log_info("sending file with fd: %d", client->file_fd);
-    log_info("closing file ..");
-    close(client->file_fd);
+    ssize_t n = sendfile(client->event.fd, client->file_fd,
+            &client->file_offset,
+            client->file_size - client->file_offset);
 
-    client->state = CLIENT_CLOSING;
-    send_to_client(es, client);
+    if (n == -1) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return;
+        else {
+            client->state = CLIENT_CLOSING;
+            return send_to_client(es, client);
+        }
+    }
+
+    
+    if (client->file_offset == client->file_size) {
+        client->state = CLIENT_CLOSING;
+        send_to_client(es, client);
+    }
 }
 
 static void close_client(EventSystem* es, HTTPClient* client) {
-    log_info("closing client");
+    if (client->file_fd != -1)
+        close(client->file_fd);
+
     es_del(es, client->event.fd);
     close(client->event.fd);
     free(client);
@@ -227,9 +241,13 @@ static void parse_http_request(EventSystem* es, HTTPClient* client) {
     resolve_path(es, client, path);
 
     if (!client->http_error) {
-        const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ntest";
-        client->headers_len = strlen(response);
-        memcpy(client->headers, response, client->headers_len);
+        snprintf(client->headers, sizeof(client->headers),
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Length: %ld\r\n"
+                "Connection: close\r\n\r\n",
+                client->file_size);
+
+        client->headers_len = strlen(client->headers);
     }
 }
 
@@ -289,6 +307,7 @@ static void resolve_path(EventSystem* es, HTTPClient* client, const char* path) 
     }
 
     client->file_fd = file_fd;
+    client->file_size = st.st_size;
 }
 
 static void decode_url(const char* src, char* dst, size_t dst_size) {

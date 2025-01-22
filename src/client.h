@@ -33,6 +33,8 @@ typedef struct HTTPClient {
     bool http_error;
 
     int file_fd;
+    off_t file_offset;
+    size_t file_size;
 } HTTPClient;
 
 HTTPClient* http_client_init(int fd, ClientState state);
