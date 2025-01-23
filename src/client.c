@@ -25,6 +25,7 @@ HTTPClient* http_client_init(int fd, ClientState state) {
     client->file_fd = -1;
     client->file_offset = 0;
     client->file_size = 0;
+    client->file_mime_type = NULL;
 
     return client;
 error:

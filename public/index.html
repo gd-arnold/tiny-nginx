@@ -4,8 +4,40 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tiny Nginx</title>
+    <link rel="stylesheet" href="index.css">
 </head>
 <body>
-    <h2>This file was served by tiny nginx!</h2>
+    <div class="container">
+        <header>
+            <h1>Tiny Nginx</h1>
+            <p class="subtitle">If you're seeing this, tiny nginx is working!</p>
+        </header>
+        
+        <main>
+            <section class="card">
+                <h2>Server Information</h2>
+                <p>The current time is: <span id="current-time">Loading...</span></p>
+                <button id="test-button">Click Me!</button>
+                <p id="click-count">Button clicks: 0</p>
+            </section>
+            
+            <section class="card">
+                <h2>Test Features</h2>
+                <ul>
+                    <li>HTML loading ✓</li>
+                    <li>CSS styling ✓</li>
+                    <li>JavaScript execution ✓</li>
+                    <li>Interactive elements ✓</li>
+                </ul>
+                <div class="color-box"></div>
+            </section>
+        </main>
+        
+        <footer>
+            <p>Created for testing purposes</p>
+        </footer>
+    </div>
+    
+    <script src="index.js"></script>
 </body>
 </html>

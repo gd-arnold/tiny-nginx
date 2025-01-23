@@ -1,5 +1,6 @@
 #include <sys/stat.h> 
 #include <asm-generic/errno.h>
+#include <strings.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,6 +40,8 @@ static void set_http_error_headers(EventSystem* es, HTTPClient* client, const ch
 static void resolve_path(EventSystem* es, HTTPClient* client, const char* path);
 static void decode_url(const char* src, char* dst, size_t dst_size);
 
+static const char* get_mime_type(const char* path);
+
 void run_worker_process(TCPServer* server) {
     EventSystem* es = event_system_init();
     es_add(es, (EventBase*) server, EPOLLIN);
@@ -60,8 +63,6 @@ void run_worker_process(TCPServer* server) {
                         receive_from_client(es, (HTTPClient*) event_data);
                     } else if (events & EPOLLOUT) {
                         send_to_client(es, (HTTPClient*) event_data);
-                        free(es);
-                        return;
                     }
 
                     break;
@@ -244,8 +245,9 @@ static void parse_http_request(EventSystem* es, HTTPClient* client) {
         snprintf(client->headers, sizeof(client->headers),
                 "HTTP/1.1 200 OK\r\n"
                 "Content-Length: %ld\r\n"
+                "Content-Type: %s\r\n"
                 "Connection: close\r\n\r\n",
-                client->file_size);
+                client->file_size, client->file_mime_type);
 
         client->headers_len = strlen(client->headers);
     }
@@ -256,8 +258,8 @@ static void set_http_error_headers(EventSystem* es, HTTPClient* client, const ch
 
     snprintf(client->headers, sizeof(client->headers),
             "HTTP/1.1 %s\r\n"
-            "Content-Type: text/plain\r\n"
             "Content-Length: 0\r\n"
+            "Content-Type: text/plain\r\n"
             "Connection: close\r\n\r\n",
             type);
     client->headers_len = strlen(client->headers);
@@ -308,6 +310,7 @@ static void resolve_path(EventSystem* es, HTTPClient* client, const char* path) 
 
     client->file_fd = file_fd;
     client->file_size = st.st_size;
+    client->file_mime_type = get_mime_type(resolved_path);
 }
 
 static void decode_url(const char* src, char* dst, size_t dst_size) {
@@ -325,4 +328,44 @@ static void decode_url(const char* src, char* dst, size_t dst_size) {
             dst[j] = src[i];
         }
     }
+}
+
+static const char* get_mime_type(const char* path) {
+    const char *dot = strrchr(path, '.');
+    if (!dot || dot == path) return "application/octet-stream";
+
+    const char *ext = dot + 1;
+
+    if (strcasecmp(ext, "html") == 0 || strcasecmp(ext, "htm") == 0)
+        return "text/html";
+    if (strcasecmp(ext, "css") == 0)
+        return "text/css";
+    if (strcasecmp(ext, "js") == 0)
+        return "application/javascript";
+    if (strcasecmp(ext, "json") == 0)
+        return "application/json";
+    if (strcasecmp(ext, "txt") == 0)
+        return "text/plain";
+    if (strcasecmp(ext, "jpg") == 0 || strcasecmp(ext, "jpeg") == 0)
+        return "image/jpeg";
+    if (strcasecmp(ext, "png") == 0)
+        return "image/png";
+    if (strcasecmp(ext, "gif") == 0)
+        return "image/gif";
+    if (strcasecmp(ext, "svg") == 0)
+        return "image/svg+xml";
+    if (strcasecmp(ext, "ico") == 0)
+        return "image/x-icon";
+    if (strcasecmp(ext, "woff") == 0)
+        return "font/woff";
+    if (strcasecmp(ext, "woff2") == 0)
+        return "font/woff2";
+    if (strcasecmp(ext, "ttf") == 0)
+        return "font/ttf";
+    if (strcasecmp(ext, "pdf") == 0)
+        return "application/pdf";
+    if (strcasecmp(ext, "zip") == 0)
+        return "application/zip";
+    
+    return "application/octet-stream";
 }

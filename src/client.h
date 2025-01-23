@@ -35,6 +35,7 @@ typedef struct HTTPClient {
     int file_fd;
     off_t file_offset;
     size_t file_size;
+    const char* file_mime_type;
 } HTTPClient;
 
 HTTPClient* http_client_init(int fd, ClientState state);
