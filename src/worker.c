@@ -1,8 +1,11 @@
+#define _GNU_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#include <asm-generic/errno-base.h>
 #include <sys/stat.h> 
+#include <signal.h>
 #include <asm-generic/errno.h>
 #include <strings.h>
 #include <errno.h>
-#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -12,6 +15,7 @@
 #include <stdint.h>
 #include <sys/socket.h>
 #include <sys/sendfile.h>
+#include <sys/signalfd.h>
 #include <arpa/inet.h>
 #include <sys/epoll.h>
 #include <stdlib.h>
@@ -42,19 +46,30 @@ static void decode_url(const char* src, char* dst, size_t dst_size);
 
 static const char* get_mime_type(const char* path);
 
+static void set_up_signal_event(EventBase* e);
+
 void run_worker_process(TCPServer* server) {
+    bool running = true;
+
+    EventBase signal;
+    set_up_signal_event(&signal);
+    
     EventSystem* es = event_system_init();
     es_add(es, (EventBase*) server, EPOLLIN);
+    es_add(es, &signal, EPOLLIN);
 
-    // non-blocking event loop
-    while (true) {
-        size_t nready = es_wait(es);
+    while (running) {
+        int nready = es_wait(es);
+        check(nready != -1, "Failed receiving epoll events");
 
         for (size_t i = 0; i < nready; i++) {
             EventBase* event_data = (EventBase*) es->events[i].data.ptr;
             uint32_t events = es->events[i].events;
             
             switch (event_data->type) {
+                case SIGNAL_EVENT:
+                    running = false;
+                    break;
                 case SERVER_EVENT:
                     accept_client(es, (TCPServer*) event_data);
                     break;
@@ -68,10 +83,15 @@ void run_worker_process(TCPServer* server) {
                     break;
             }
        }
-   }
+    }
 
+    close(signal.fd);
+    close(es->epoll_fd);
     free(es);
-    return ;
+
+    return;
+error:
+    exit(EXIT_FAILURE);
 }
 
 static void accept_client(EventSystem* es, TCPServer* server) {
@@ -205,12 +225,14 @@ static void send_file(EventSystem* es, HTTPClient* client) {
 
     
     if (client->file_offset == client->file_size) {
+        log_info("DONE SENDING FILE");
         client->state = CLIENT_CLOSING;
         send_to_client(es, client);
     }
 }
 
 static void close_client(EventSystem* es, HTTPClient* client) {
+    log_info("HEREEEEEEEEEEEEE");
     if (client->file_fd != -1)
         close(client->file_fd);
 
@@ -368,4 +390,23 @@ static const char* get_mime_type(const char* path) {
         return "application/zip";
     
     return "application/octet-stream";
+}
+
+static void set_up_signal_event(EventBase* e) {
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGINT);
+    sigaddset(&mask, SIGTERM);
+
+    int sm = sigprocmask(SIG_BLOCK, &mask, NULL);
+    check(sm != -1, "Failed setting SIG_BLOCK in signal mask (needed for signalfd)");
+
+    int fd = signalfd(-1, &mask, 0);
+    check(fd != -1, "Failed creating signalfd");
+
+    e->fd = fd;
+    e->type = SIGNAL_EVENT;
+    return;
+error:
+    exit(EXIT_FAILURE);
 }

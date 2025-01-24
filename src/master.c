@@ -35,7 +35,7 @@ void run_master_process(MasterProcess* master) {
 
     // todo: run ev loop; handle signals from child processes
     //while (true) {
-        sleep(10);
+        sleep(15);
     //}
     return;
 }
@@ -59,7 +59,6 @@ static void spawn_worker_processes(MasterProcess* master) {
 
             log_info("Worker #%ld (PID: %d) started working\n\n", i + 1, w_pid);
 
-            // todo: run ev loop
             run_worker_process(master->server);
 
             log_info("Worker #%ld (PID: %d) finished working\n\n", i + 1, w_pid);

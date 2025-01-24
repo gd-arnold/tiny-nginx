@@ -56,9 +56,8 @@ error:
     exit(EXIT_FAILURE);
 }
 
-size_t es_wait(EventSystem* es) {
-    size_t nready = epoll_wait(es->epoll_fd, es->events, MAX_EVENTS, -1);
-    return nready;
+int es_wait(EventSystem* es) {
+    return epoll_wait(es->epoll_fd, es->events, MAX_EVENTS, -1);
 }
 
 void make_non_blocking(int fd) {

@@ -31,7 +31,7 @@ void tcp_server_start(TCPServer* server) {
     make_non_blocking(fd);
 
     // todo: read port from config file
-    uint16_t port = 3641;
+    uint16_t port = 3642;
 
     // bypass TIME_WAIT
     int opt = 1;
