@@ -1,8 +1,13 @@
+#define _GNU_SOURCE
+#define _POSIX_C_SOURCE 200809L
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sys/wait.h>
+#include <signal.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <signal.h>
 
 #include "dbg.h"
 #include "server.h"
@@ -10,8 +15,11 @@
 #include "worker.h"
 
 static void spawn_worker_processes(MasterProcess* master);
-//static void handle_worker_exit(MasterProcess* master);
-//static void handle_shutdown(MasterProcess* master);
+
+static void set_up_shutdown_signals();
+static void handle_shutdown_signal(int sig);
+
+static volatile sig_atomic_t g_running = true;
 
 MasterProcess* master_process_init() {
     MasterProcess* master = (MasterProcess *)malloc(sizeof(MasterProcess));
@@ -20,7 +28,7 @@ MasterProcess* master_process_init() {
     master->pid = getpid();
     memset(master->w_pids, 0, sizeof(master->w_pids));
     // todo: read workers count from config file
-    master->workers_count = 1;
+    master->workers_count = 16;
 
     master->server = tcp_server_init();
     tcp_server_start(master->server);
@@ -31,13 +39,19 @@ error:
 }
 
 void run_master_process(MasterProcess* master) { 
+    set_up_shutdown_signals();
     spawn_worker_processes(master);
 
-    // todo: run ev loop; handle signals from child processes
-    //while (true) {
-        sleep(15);
-    //}
-    return;
+    // block until shutdown signal requested
+    while (g_running) {
+        sleep(1);
+    }
+
+    // send SIGTERM to all workers
+    kill(0, SIGTERM);
+    
+    // wait until workers terminate
+    while (wait(NULL) > 0) {}
 }
 
 void free_master_process(MasterProcess* master) {
@@ -68,7 +82,23 @@ static void spawn_worker_processes(MasterProcess* master) {
         }
     }
 
-    return ;
+    return;
 error:
     exit(EXIT_FAILURE);
 }
+
+static void set_up_shutdown_signals() {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+
+    sa.sa_handler = handle_shutdown_signal;
+
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGHUP, &sa, NULL);
+}
+
+static void handle_shutdown_signal(int sig) {
+    g_running = false;
+}
+
