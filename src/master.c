@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sched.h>
 #include <sys/wait.h>
 #include <signal.h>
 #include <unistd.h>
@@ -27,8 +28,11 @@ MasterProcess* master_process_init() {
 
     master->pid = getpid();
     memset(master->w_pids, 0, sizeof(master->w_pids));
-    // todo: read workers count from config file
-    master->workers_count = 16;
+
+    cpu_set_t cpu_set;
+    CPU_ZERO(&cpu_set);
+    check(sched_getaffinity(0, sizeof(cpu_set), &cpu_set) != -1, "Failed retrieving cpu affinity mask");
+    master->workers_count = CPU_COUNT(&cpu_set);
 
     master->server = tcp_server_init();
     tcp_server_start(master->server);
