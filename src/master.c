@@ -73,7 +73,13 @@ static void spawn_worker_processes(MasterProcess* master) {
         if (pid == 0) {
             pid_t w_pid = getpid();
 
-            // todo: bind w_pid to a cpu
+            // bind w_pid to a cpu
+            cpu_set_t child_cpu_set;
+            CPU_ZERO(&child_cpu_set);
+            CPU_SET(i, &child_cpu_set);
+
+            check(sched_setaffinity(0, sizeof(child_cpu_set), &child_cpu_set) != -1,
+                    "Failed setting cpu affinity for worker #%ld (PID: %d)", i + 1, w_pid);
 
             log_info("Worker #%ld (PID: %d) started working\n\n", i + 1, w_pid);
 
