@@ -22,7 +22,7 @@ static void handle_shutdown_signal(int sig);
 
 static volatile sig_atomic_t g_running = true;
 
-MasterProcess* master_process_init() {
+MasterProcess* master_process_init(uint16_t port) {
     MasterProcess* master = (MasterProcess *)malloc(sizeof(MasterProcess));
     check_mem(master);
 
@@ -35,7 +35,7 @@ MasterProcess* master_process_init() {
     master->workers_count = CPU_COUNT(&cpu_set);
 
     master->server = tcp_server_init();
-    tcp_server_start(master->server);
+    tcp_server_start(master->server, port);
 
     return master;
 error:
@@ -77,7 +77,6 @@ static void spawn_worker_processes(MasterProcess* master) {
             cpu_set_t child_cpu_set;
             CPU_ZERO(&child_cpu_set);
             CPU_SET(i, &child_cpu_set);
-
             int sr = sched_setaffinity(0, sizeof(child_cpu_set), &child_cpu_set);
             check(sr != -1, "Failed setting cpu affinity for worker #%ld (PID: %d)", i + 1, w_pid);
 

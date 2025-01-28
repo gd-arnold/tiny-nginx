@@ -15,6 +15,6 @@ typedef struct MasterProcess {
     TCPServer* server;
 } MasterProcess;
 
-MasterProcess* master_process_init();
+MasterProcess* master_process_init(uint16_t port);
 void run_master_process(MasterProcess* master);
 void free_master_process(MasterProcess* master);

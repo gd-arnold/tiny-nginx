@@ -23,15 +23,12 @@ error:
     exit(EXIT_FAILURE);
 }
 
-void tcp_server_start(TCPServer* server) {
+void tcp_server_start(TCPServer* server, uint16_t port) {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     check(fd != -1, "Server socket creation failed");
 
     // make non-blocking
     make_non_blocking(fd);
-
-    // todo: read port from config file
-    uint16_t port = 3642;
 
     // bypass TIME_WAIT
     int opt = 1;

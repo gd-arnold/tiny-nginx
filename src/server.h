@@ -10,5 +10,5 @@ typedef struct TCPServer {
 } TCPServer;
 
 TCPServer* tcp_server_init();
-void tcp_server_start(TCPServer* server);
+void tcp_server_start(TCPServer* server, uint16_t port);
 void tcp_server_stop(TCPServer* server);
