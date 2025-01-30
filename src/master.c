@@ -20,6 +20,8 @@ static void spawn_worker_processes(MasterProcess* master);
 static void set_up_shutdown_signals();
 static void handle_shutdown_signal(int sig);
 
+static void print_server_banner(MasterProcess* master);
+
 static volatile sig_atomic_t g_running = true;
 
 MasterProcess* master_process_init(uint16_t port) {
@@ -46,6 +48,8 @@ void run_master_process(MasterProcess* master) {
     set_up_shutdown_signals();
     spawn_worker_processes(master);
 
+    print_server_banner(master);
+    
     // block until shutdown signal requested
     while (g_running) {
         sleep(1);
@@ -80,13 +84,10 @@ static void spawn_worker_processes(MasterProcess* master) {
             int sr = sched_setaffinity(0, sizeof(child_cpu_set), &child_cpu_set);
             check(sr != -1, "Failed setting cpu affinity for worker #%ld (PID: %d)", i + 1, w_pid);
 
-            log_info("Worker #%ld (PID: %d) started working\n\n", i + 1, w_pid);
-
             run_worker_process(master->server);
 
-            log_info("Worker #%ld (PID: %d) finished working\n\n", i + 1, w_pid);
-
             free_master_process(master);
+
             exit(EXIT_SUCCESS);
         }
     }
@@ -111,3 +112,25 @@ static void handle_shutdown_signal(int sig) {
     g_running = false;
 }
 
+static void print_server_banner(MasterProcess* master) {
+    const char* COLOR_GREEN = "\033[32m";
+    const char* COLOR_BOLD_GREEN = "\033[1;32m";
+    const char* COLOR_YELLOW = "\033[33m";
+    const char* COLOR_BLUE = "\033[34m";
+    const char* COLOR_CYAN = "\033[36m";
+    const char* COLOR_RED = "\033[31m";
+    const char* COLOR_RESET = "\033[0m";
+
+    printf("%s%sTiny Nginx%s UP & RUNNING on %shttp://localhost:%d%s\n",
+            COLOR_BOLD_GREEN, COLOR_GREEN, COLOR_RESET,
+            COLOR_CYAN, master->server->port, COLOR_RESET);
+
+    printf("%sNumber of workers spawned: %s16%s\n",
+            COLOR_YELLOW, COLOR_RESET, COLOR_YELLOW);
+
+    printf("%sServing files from %s%s%s\n\n",
+            COLOR_BLUE, COLOR_RESET, PUBLIC_DIR, COLOR_BLUE);
+
+    printf("%sPress [%sCtrl+C%s] to stop the server%s\n",
+            COLOR_RESET, COLOR_RED, COLOR_RESET, COLOR_RESET);
+}

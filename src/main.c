@@ -25,7 +25,6 @@ uint16_t parse_port(int argc, char* argv[]) {
     
     int opt;
     while ((opt = getopt(argc, argv, "p:")) != -1) {
-        log_info("here");
         switch (opt) {
             case 'p':
                 port = port_to_num(optarg);

@@ -101,15 +101,11 @@ static void accept_client(EventSystem* es, TCPServer* server) {
     int fd = accept(server->event.fd, (struct sockaddr*) &client_addr, &client_addr_size);
 
     if (fd == -1) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK)
-            return;
-        else
+        if (errno != EAGAIN && errno != EWOULDBLOCK)
             log_err("Worker (PID: #%d) failed accepting connection", getpid());
+
+        return;
     }
-
-    log_info("Worker (PID: #%d) accepted request from client #%d", getpid(), fd);
-
-    // todo: log client data
 
     make_non_blocking(fd);
 
@@ -119,7 +115,6 @@ static void accept_client(EventSystem* es, TCPServer* server) {
 
     HTTPClient* client = http_client_init(fd, CLIENT_RECEIVING_REQUEST);
     es_add(es, (EventBase*) client, EPOLLIN);
-    log_info("Worker (PID: #%d) added client #%d to epoll", getpid(), fd);
 
     return;
 error:
@@ -157,8 +152,8 @@ static void receive_request(EventSystem* es, HTTPClient* client) {
     if (bytes_received == -1) {
         if (errno == EAGAIN || errno == EWOULDBLOCK)
             return;
-        else
-            log_err("Worker (PID: #%d) failed receiving from client #%d", getpid(), client->event.fd);
+
+        close_client(es, client);
     }
 
     // connection closed by client
@@ -171,8 +166,6 @@ static void receive_request(EventSystem* es, HTTPClient* client) {
         return set_http_error_headers(es, client, "413 Content Too Large");
 
     client->request[client->request_len] = '\0';
-    log_info("Worker (PID: #%d) received from client #%d", getpid(), client->event.fd);
-    log_info("%s", client->request);
 
     if (strstr(client->request, "\r\n\r\n") != NULL) {
         parse_http_request(es, client);
@@ -187,13 +180,12 @@ static void send_headers(EventSystem* es, HTTPClient* client) {
         send(client->event.fd, client->headers + client->headers_sent, 
                 client->headers_len, 0);
 
-    log_info("sending to client #%d", client->event.fd);
-
     if (bytes_sent == -1) {
         if (errno == EAGAIN || errno == EWOULDBLOCK)
             return;
-        else
-            log_err("Worker (PID: #%d) failed sending to client #%d", getpid(), client->event.fd);
+
+        client->state = CLIENT_CLOSING;
+        return send_to_client(es, client);
     }
 
     client->headers_sent += bytes_sent;
@@ -217,22 +209,19 @@ static void send_file(EventSystem* es, HTTPClient* client) {
     if (n == -1) {
         if (errno == EAGAIN || errno == EWOULDBLOCK)
             return;
-        else {
-            client->state = CLIENT_CLOSING;
-            return send_to_client(es, client);
-        }
+
+        client->state = CLIENT_CLOSING;
+        return send_to_client(es, client);
     }
 
     
     if (client->file_offset == client->file_size) {
-        log_info("DONE SENDING FILE");
         client->state = CLIENT_CLOSING;
         send_to_client(es, client);
     }
 }
 
 static void close_client(EventSystem* es, HTTPClient* client) {
-    log_info("HEREEEEEEEEEEEEE");
     if (client->file_fd != -1)
         close(client->file_fd);
 
