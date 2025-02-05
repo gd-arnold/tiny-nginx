@@ -18,7 +18,7 @@
 static void spawn_worker_processes(MasterProcess* master);
 
 static void set_up_shutdown_signals();
-static void handle_shutdown_signal(int sig);
+static void handle_shutdown_signal();
 
 static void print_server_banner(MasterProcess* master);
 
@@ -108,7 +108,7 @@ static void set_up_shutdown_signals() {
     sigaction(SIGHUP, &sa, NULL);
 }
 
-static void handle_shutdown_signal(int sig) {
+static void handle_shutdown_signal() {
     g_running = false;
 }
 
