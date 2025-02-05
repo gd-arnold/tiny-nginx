@@ -3,8 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tiny Nginx</title>
-    <link rel="stylesheet" href="index.css">
+    <title>Tiny Nginx Test</title>
+    <script>
+        window.perfMetrics = {
+            timing: {
+                pageStart: performance.now(),
+                htmlLoaded: null,
+                cssLoaded: null,
+                jsLoaded: null
+            },
+            requests: {
+                html: { status: 'Loading...', duration: null },
+                css: { status: 'Loading...', duration: null },
+                js: { status: 'Loading...', duration: null }
+            }
+        };
+        
+        window.perfMetrics.timing.htmlLoaded = performance.now();
+        window.perfMetrics.requests.html.status = '200 OK';
+        window.perfMetrics.requests.html.duration = window.perfMetrics.timing.htmlLoaded - window.perfMetrics.timing.pageStart;
+    </script>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
@@ -13,29 +32,40 @@
             <p class="subtitle">If you're seeing this, tiny nginx is working!</p>
         </header>
         
-        <main>
-            <section class="card">
-                <h2>Server Information</h2>
-                <p>The current time is: <span id="current-time">Loading...</span></p>
-                <button id="test-button">Click Me!</button>
-                <p id="click-count">Button clicks: 0</p>
-            </section>
-            
-            <section class="card">
-                <h2>Test Features</h2>
-                <ul>
-                    <li>HTML loading ✓</li>
-                    <li>CSS styling ✓</li>
-                    <li>JavaScript execution ✓</li>
-                    <li>Interactive elements ✓</li>
-                </ul>
-                <div class="color-box"></div>
-            </section>
-        </main>
-        
-        <footer>
-            <p>Created for testing purposes</p>
-        </footer>
+        <section class="metrics-panel">
+            <h2>Performance Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-card" id="html-metric">
+                    <h3>index.html</h3>
+                    <div class="status-indicator" id="html-status"></div>
+                    <div class="metric-value" id="html-time">Calculating...</div>
+                    <div class="progress-bar">
+                        <div class="progress" id="html-progress"></div>
+                    </div>
+                </div>
+                
+                <div class="metric-card" id="css-metric">
+                    <h3>styles.css</h3>
+                    <div class="status-indicator" id="css-status"></div>
+                    <div class="metric-value" id="css-time">Calculating...</div>
+                    <div class="progress-bar">
+                        <div class="progress" id="css-progress"></div>
+                    </div>
+                </div>
+                
+                <div class="metric-card" id="js-metric">
+                    <h3>index.js</h3>
+                    <div class="status-indicator" id="js-status"></div>
+                    <div class="metric-value" id="js-time">Calculating...</div>
+                    <div class="progress-bar">
+                        <div class="progress" id="js-progress"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="total-metrics">
+                <p>Total Page Load: <span id="total-load-time">Calculating...</span></p>
+            </div>
+        </section>
     </div>
     
     <script src="index.js"></script>
