@@ -30,4 +30,4 @@ $(BUILD_DIR)/$(TARGET): $(OBJ_FILES)
 
 -include $(DEP_FILES)
 
-.PHONY: all directories run valgrind clean
+.PHONY: all directories clean
