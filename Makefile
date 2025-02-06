@@ -2,7 +2,7 @@ TARGET = tinynginx
 
 CC = gcc
 DEP_FLAGS = -MP -MD
-C_FLAGS = -std=c11 -g -Wall -Werror -O1 -DPUBLIC_DIR="\"$(realpath ./public)\""
+C_FLAGS = -std=c11 -Wall -Werror -Wextra -march=native -O2 -DPUBLIC_DIR="\"$(realpath ./public)\""
 
 BUILD_DIR = build
 SRC_DIR = src
@@ -15,12 +15,6 @@ DEP_FILES = $(patsubst %.c, %.d, $(C_FILES))
 all: directories $(BUILD_DIR)/$(TARGET)
 
 directories: $(BUILD_DIR)
-
-run: all
-	$(BUILD_DIR)/$(TARGET)
-
-valgrind: all
-	valgrind $(BUILD_DIR)/$(TARGET)
 
 clean:
 	rm -rf $(BUILD_DIR)/$(TARGET) $(OBJ_FILES) $(TEST_BINS) $(DEP_FILES)
