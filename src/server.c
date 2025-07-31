@@ -48,11 +48,8 @@ error:
 }
 
 void tcp_server_start(TCPServer* server, uint16_t port) {
-    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
     check(fd != -1, "Server socket creation failed");
-
-    // make non-blocking
-    make_non_blocking(fd);
 
     // bypass TIME_WAIT
     int opt = 1;

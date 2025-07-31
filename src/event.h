@@ -47,5 +47,3 @@ void es_mod(EventSystem* es, EventBase* data, uint32_t events);
 void es_del(EventSystem* es, int fd);
 
 int es_wait(EventSystem* es);
-
-void make_non_blocking(int fd);
