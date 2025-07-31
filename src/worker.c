@@ -121,7 +121,7 @@ static void accept_client(EventSystem* es, TCPServer* server) {
     struct sockaddr_in client_addr;
     socklen_t client_addr_size = sizeof(client_addr);
 
-    int fd = accept(server->event.fd, (struct sockaddr*) &client_addr, &client_addr_size);
+    int fd = accept4(server->event.fd, (struct sockaddr*) &client_addr, &client_addr_size, SOCK_NONBLOCK);
 
     if (fd == -1) {
         if (errno != EAGAIN && errno != EWOULDBLOCK)
@@ -129,8 +129,6 @@ static void accept_client(EventSystem* es, TCPServer* server) {
 
         return;
     }
-
-    make_non_blocking(fd);
 
     int opt = 1;
     int or = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));

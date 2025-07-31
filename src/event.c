@@ -84,14 +84,3 @@ int es_wait(EventSystem* es) {
     return epoll_wait(es->epoll_fd, es->events, MAX_EVENTS, -1);
 }
 
-void make_non_blocking(int fd) {
-    int flags = fcntl(fd, F_GETFL, 0);
-    check(flags != -1, "Failed getting flags of fd #%d", fd);
-
-    int res = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-    check(res != -1, "Failed making fd #%d non-blocking", fd);
-
-    return;
-error:
-    exit(EXIT_FAILURE);
-}
