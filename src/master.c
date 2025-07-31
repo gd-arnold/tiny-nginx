@@ -149,8 +149,8 @@ static void print_server_banner(MasterProcess* master) {
             COLOR_BOLD_GREEN, COLOR_GREEN, COLOR_RESET,
             COLOR_CYAN, master->server->port, COLOR_RESET);
 
-    printf("%sNumber of workers spawned: %s16%s\n",
-            COLOR_YELLOW, COLOR_RESET, COLOR_YELLOW);
+    printf("%sNumber of workers spawned: %s%d%s\n",
+            COLOR_YELLOW, COLOR_RESET, master->workers_count, COLOR_YELLOW);
 
     printf("%sServing files from %s%s%s\n\n",
             COLOR_BLUE, COLOR_RESET, PUBLIC_DIR, COLOR_BLUE);
